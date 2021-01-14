@@ -5,12 +5,30 @@ from binance.enums import *
 
 app = Flask(__name__)
 
-client = Client(config.API_KEY, config.API_SECRET, tld='us')
+client = Client(config.API_KEY, config.API_SECRET, tld='com')
 
-def order(side, quantity, symbol, order_type=ORDER_TYPE_MARKET):
+def get_symbol_name(symbol):
     try:
-        print(f"sending order {order_type} - {side} {quantity} {symbol}")
-        order = client.create_order(symbol=symbol, side=side, type=order_type, quantity=quantity)
+        if symbol.endswith('PERP'):
+            return symbol.rstrip('PERP')
+        return symbol
+    except:
+        return ''
+
+def order(side, symbol, order_type=ORDER_TYPE_MARKET):
+    try:
+        # set the percentage or fraction you want to invest in each order
+
+        if side == 'BUY':
+            balance= client.get_asset_balance(asset='USDT')
+            portion_balance = float(balance['free']) * 0.2
+        
+        elif side == 'SELL':
+            balance = client.get_asset_balance(asset=symbol)
+            portion_balance = float(balance['free'])
+
+        print(f"sending order {order_type} - {side} {portion_balance} {symbol}")
+        order = client.futures_create_order(symbol=symbol, side=side, type=order_type, quantity=portion_balance)
     except Exception as e:
         print("an exception occured - {}".format(e))
         return False
@@ -33,9 +51,9 @@ def webhook():
         }
 
     side = data['strategy']['order_action'].upper()
-    quantity = data['strategy']['order_contracts']
-    order_type = data['ticker']
-    order_response = order(side, quantity, order_type)
+    symbol = get_symbol_name(data['ticker'])
+
+    order_response = order(side, symbol ,order_type)
 
     if order_response:
         return {
